@@ -5,6 +5,10 @@ class Game {
     this.winsElement = container.querySelector('.status__wins');
     this.lossElement = container.querySelector('.status__loss');
 
+    // Находим элемент линии таймера
+    this.timerLine = container.querySelector('.timer-line');
+    this.timerInterval = null;
+
     this.reset();
 
     this.registerEvents();
@@ -17,14 +21,54 @@ class Game {
   }
 
   registerEvents() {
-    /*
-      TODO:
-      Написать обработчик события, который откликается
-      на каждый введённый символ.
-      В случае правильного ввода символа вызываем this.success()
-      При неправильном вводе символа - this.fail();
-      DOM-элемент текущего символа находится в свойстве this.currentSymbol.
-     */
+    document.addEventListener('keyup', (event) => {
+    // Защита: если текущего символа нет, ничего не делаем
+    if (!this.currentSymbol) {
+      return;
+    }
+
+    // Извлекаем текстовый символ из DOM-элемента и переводим в нижний регистр
+    const targetSymbol = this.currentSymbol.textContent.toLowerCase();
+
+    // Получаем символ нажатой клавиши в нижнем регистре
+    const pressedSymbol = event.key.toLowerCase();
+
+    // Игнорируем нажатия системных клавиш (Shift, Alt, Control, CapsLock),
+    // так как их свойство event.key возвращает строку длинее 1 символа
+    if (event.key.length > 1) {
+      return;
+    }
+
+    // Сравниваем символы независимо от регистра
+    if (pressedSymbol === targetSymbol) {
+      this.success(); // Символы совпали
+    } else {
+      this.fail();    // Игрок ошибся
+    }
+    });
+  }
+
+  // Запуск таймера: N секунд на N символов
+  startTimer(wordLength) {
+    // Очищаем предыдущий таймер, если он запущен
+    clearInterval(this.timerInterval);
+
+    const totalTime = wordLength * 1000; // Переводим секунды в миллисекунды
+    let timeLeft = totalTime;
+
+    this.timerInterval = setInterval(() => {
+      timeLeft -= 100; // Шаг уменьшения — 100 миллисекунд
+
+      // Вычисляем процент оставшегося времени для CSS-анимации полосы
+      const percentage = (timeLeft / totalTime) * 100;
+      this.timerLine.style.width = `${percentage}%`;
+
+      // Если время вышло — фиксируем проигрыш раунда
+      if (timeLeft <= 0) {
+        clearInterval(this.timerInterval);
+        this.fail();
+      }
+    }, 100);
   }
 
   success() {
@@ -37,25 +81,51 @@ class Game {
       return;
     }
 
-    if (++this.winsElement.textContent === 10) {
-      alert('Победа!');
-      this.reset();
+    // Слово успешно завершено — останавливаем текущий таймер
+    clearInterval(this.timerInterval);
+
+    // Сначала увеличиваем счётчик побед и мгновенно выводим "10" на экран
+    this.winsElement.textContent = ++this.winsElement.textContent;
+
+    if (this.winsElement.textContent == 10) {
+      // Задержка в 0 миллисекунд позволяет браузеру сначала перерисовать DOM,
+      // чтобы игрок увидел цифру 10, а затем показывает alert.
+      setTimeout(() => {
+        alert('🎉 Победа! Вы правильно ввели 10 слов.');
+        this.reset();
+      }, 0);
+      return;
     }
     this.setNewWord();
   }
 
   fail() {
-    if (++this.lossElement.textContent === 5) {
-      alert('Вы проиграли!');
-      this.reset();
+    // Слово провалено (из-за ошибки или времени) — останавливаем текущий таймер
+    clearInterval(this.timerInterval);
+
+    // Сначала увеличиваем счётчик и мгновенно выводим цифру на экран
+    this.lossElement.textContent = ++this.lossElement.textContent;
+
+    // Проверяем условие проигрыша
+    if (this.lossElement.textContent == 3) {
+      // Использование setTimeout(..., 0) позволяет браузеру сначала отобразить тройку 
+      // на экране, а уже в следующий миг показать окно проигрыша.
+      setTimeout(() => {
+        alert('Вы проиграли!');
+        this.reset();
+      }, 0);
+      return;
     }
+    
     this.setNewWord();
   }
 
   setNewWord() {
     const word = this.getWord();
-
     this.renderWord(word);
+
+    // Запускаем таймер, передавая длину нового слова
+    this.startTimer(word.length);
   }
 
   getWord() {
